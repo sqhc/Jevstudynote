@@ -1,0 +1,61 @@
+{
+  "generated_at_utc": "2026-10-13T02:40:03.731722+00:00",
+  "mode": "offline",
+  "status": "offline_verified_live_pending",
+  "chapters": [
+    {
+      "chapter": "introduction",
+      "file": "validation/offline_previews/01_认识Jev.ipynb",
+      "markdown_cells": 21,
+      "code_cells": 14,
+      "max_code_lines": 27,
+      "kind": "jev_execution_audit",
+      "executed_at_utc": "2026-10-13T02:40:04.313686+00:00",
+      "sdk": "0.7.4",
+      "requested_model": "jev-1.13.0",
+      "mode": "offline",
+      "ping": {
+        "source": "offline",
+        "reason": "未发起连通性请求（无 client：未配置密钥或强制离线）"
+      },
+      "real_calls": 0,
+      "offline_calls": 4,
+      "cases": [
+        {
+          "case": "实验A·三原语一次调用",
+          "source": "offline",
+          "model": "人工示例，非模型预测",
+          "seconds": null,
+          "input_tokens": 0,
+          "output_tokens": 0
+        },
+        {
+          "case": "指挥台·runner_injury",
+          "source": "offline",
+          "model": "人工示例，非模型预测",
+          "seconds": null,
+          "input_tokens": 0,
+          "output_tokens": 0
+        },
+        {
+          "case": "指挥台·water_station",
+          "source": "offline",
+          "model": "人工示例，非模型预测",
+          "seconds": null,
+          "input_tokens": 0,
+          "output_tokens": 0
+        },
+        {
+          "case": "指挥台·shirt_pickup",
+          "source": "offline",
+          "model": "人工示例，非模型预测",
+          "seconds": null,
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      ],
+      "coverage": {},
+      "validation_status": "offline_only_not_model_evidence"
+    }
+  ]
+}
