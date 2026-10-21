@@ -96,6 +96,29 @@
 | 应用构建 | 八条路径、补充示例、工具单位漏检 | 2026-10-15 live（12 次调用）：billing/orders/account_normal/account_high/closed→no_action/quarantine 六条路径命中；quarantine 风险 0.893（索要凭据 0.98 + 意外奖励 0.98 + 身份不符 0.69）。**COVERAGE.missing=[review_spam, review_topic]**：review_spam 案例被判 account_normal（unexpected_reward 0.65 未过隔离阈值）、review_topic 案例被判 orders（mentions_open_order 仅 0.02）——两条 review 路由本次未观察到，预期差在触发阈值与试句强度，建议按 MAINTENANCE 流程追加更强信号试句重跑；仍不出现则记「样本未观察到」。补充示例（航班退款 0.97、嵌套 0.97/0.94、记录比较 0.95、虚拟卡 1.0）符合预期；工具轨迹九问中 weather_unit_matches=0.02 且与代码断言「单位不一致」一致——「工具单位漏检」分支被观察到 |
 | 应用场景 | 相关性排序、空结果出口、过度泛化论断 | 待真实运行 |
 
+**2026-10-21 实战指南 18 篇实测记录（模型按 `model=jev-latest` 请求，SDK 由 Notebook 内 `%pip -U` 安装；Jupyter 手工执行，无批量执行器记录）。** 18 篇此前均为「从未执行」状态（HEAD 输出全空），本轮为**首次真实 API 全量执行**：源码零改动，只补执行计数与输出；全部连通性确认 live、零错误输出、零离线回退触发；密钥扫描 `apikey_[0-9a-fA-F]{16,}` 全部 0 命中。共性问题：每篇第 2 个代码 cell（import/客户端）execution_count 为 null（Jupyter 偶发不记数，输出齐全不判断链）；15 篇的 TS 类 cell 曾在主流程后单独重跑一次（exec=11，仅重新实例化客户端、不影响已存输出）。5 篇的观察要点原按离线拟制数据预期撰写、与真实输出矛盾，已于本轮修订解读文字使其如实记录实测（修订不触碰源码与输出）；其余偏离按「本次样本未观察到」记录如下。
+
+| 篇目 | 核心实测结果 | 偏离预期之处 / 未观察到路径 |
+|---|---|---|
+| 01 自一致性 Noul | 车险理赔 5 问 ×5 次采样：covered 0.80±0.005、repairable 0.88、fraud_flag 0.15、rental 0.34、manual_review 0.70，stdev ≤0.013 | rental（拟制 0.50→0.34）、manual_review（0.56→0.70）漂移但决策不变；真实波动反而小于拟制 |
+| 02 自一致性 Choice | 临界审核帖 ×5：moderation 稳定 escalate（conf 0.25–0.37）、queue 稳定 threat、severity 4 medium + 1 low | **conf 整体 0.23–0.37，全部 <0.60 门控 → 5 次全 uncertain（全转人工）**：拟制预期「部分自动通过」未出现；标签本身比拟制更稳（拟制曾出 keep，真实全 escalate） |
+| 03 并行提问 | 批量 4 问 159.3ms vs 逐条 336.8ms（2.1× 提速）；noul 0.99/0.99、topic operations 0.98 | noul 0.81/0.74→0.99、topic conf 0.72→0.98：真实置信度远高于拟制；批量与逐条同题差 0.03（批内漂移，新观察） |
+| 04 重排序 | 「撤销未结算转账」4 候选：0.84 / 0.10 / 0.07 / 0.02，推荐唯一且排序正确 | 候选 4（已结算需收款方退回）0.78→0.10：真实模型区分度更大、演示效果更好，无翻转 |
+| 05 逐行语义搜索 | 「修改账单邮箱」4 行：0.03/0.94/0.09/0.10，answer_exists=True | 最佳行 0.94 与拟制一致；「发票链接提到邮箱」0.51→0.09（提到≠回答），区分更严格 |
+| 06 结构恢复 | 4 连接概率 [0.70, 0.50, 0.80, 0.26] → 前四行合段、末行独立，重建正确 | 第 2 连接恰为 0.50（等于演示阈值）：结论正确但边界值敏感，后续可加固示例 |
+| 07 函数调用 | lookup_order conf 1.00；needs_confirmation noul 0.35 <0.50 → 确定性执行 | noul 0.08→0.35：真实模型更犹豫但分支不变 |
+| 08 技能推荐 | 宽召回 top-3 [meeting_summary, task, calendar]；精选 conf 1.00 | mail 被打 0.88（拟制 0.18），距 top-3 仅 0.02：宽召回区分度低于拟制，重跑有挤出风险 |
+| 09 实体对齐 | 4 对路由全中：sameAs / unlinked / curator×2（风格不符、名称+风格不符） | same_name 0.97→0.28（同一款 IPA 名称不完全相等，模型更严格）；variant score 1.00 压线取整，边界敏感 |
+| 10 RAG 段落分类 | forum-injection inj 0.98 先 drop；doc-billing/doc-2fa 低相关 drop；其余 3 段 usable | **doc-contradict 的 contradicts_premise 0.45 <0.70 → 误入 usable_evidence，conflicting=0**：否认前提的段落混入证据块；已如实修订观察要点并提示调阈值/补对抗样本 |
+| 11 引用核查 | fabricated 字符串匹配结案（不调模型）；verified_ok supports 0.98→verified | **unsupported_ok 被判 contradicts（conf 1.00）而非无关、low_conf conf 0.98 ≥0.8 直接过 auto**：设计中的 unsupported 与低置信 review 两条路径本次均未触发，全表无一条 review；已如实修订 |
+| 12 LLM 防护栏 | jailbreak/harmful 0.99→BLOCK；self_harm 0.98→support；ordinary/borderline（0.10）→pass | **medical 先 review（0.98 过 0.70）但 severity 2.60 ≥2.0 触发 review→block 升级**：拟制 severity 1.70 不会升级；borderline 未落入 review 带宽；已如实修订（机制演示价值不减反增） |
+| 13 SDE 级联 | A 干净发票 overall 0.12→ACCEPT；B 幻觉总额 total::hallucinated 0.99 → 6 信号 FIRE→ESCALATE；C overall 0.07→ACCEPT | 幻觉信号比拟制更极端（0.92→0.99）；B 中本无误的 invoice_no/notes 被连带 flag——「一个红旗就升级」被真实数据放大验证 |
+| 14 日期抽取 | 4/4 日期拼装正确（0.99/1.00/0.87），缺失→none 送审，auto 3 + review 1 | **缺失日期 conf 0.94 仍送审**：触发条件是 mode=none 逃生口而非低置信（拟制 0.40–0.46 才走低置信路）；已如实修订观察要点 |
+| 15 预解析值抽取 | 邮件角色区分（receipt 1.00 / sender 0.94）、电话 →E.164、金额 charge/credit 分流正确 | P(credit) 0.97→0.87 仍过线；执行计数有乱序重跑痕迹（见共性说明） |
+| 16 层级分类 | 3 商品贪心与束搜索 K=2 路径完全一致（p 全 1.00，第二路径分 ≈0.000） | **边概率全部饱和到 1.00**：「中间层概率接近、束搜索保留另一分支」的核心对比场景本次未出现（样本太清晰）；束搜索演示退化为一致性确认，后续可补易混淆样本 |
+| 17 自动研究特征发现 | 5 条品鉴笔记特征抽取全部成功，均值基线 MAE 5.56；缺陷样本被 mentions_fault 压到误差 2.0 | 雷司令 oak_or_roast 0.01（拟制 2.8）——真实模型更贴合「未提橡木」语义；pred 挤在 83.5–84.8 高分段区分度弱 |
+| 18 基于置信度的分类 | 4 家 conf 1.00 直接报细组；瀚海控股 0.54（证券 0.60/零售 0.40 对峙）→回退大类 | **迅达物流拟制 0.78→实测 1.00 直接报组**：设计中的第二个回退案例未触发，本次仅瀚海演示回退；已如实修订观察要点 |
+
 每个发现记录日期、实际模型、state、问题版本、输出、解释及是否要修改问题；各章末尾 JSON 保留实际调用来源。
 
 若 `COVERAGE.missing` 仍有分支：先写下预期与理由，再追加几句试句，保留每次返回；仍未出现就记为“本次样本未观察到”。
